@@ -2,4 +2,4 @@
 209AS Final Project
 
 procedural_generation.py generates random configuration spaces simulated with Perlin noise to mimic archipelagos
-![Archipelago](example.png)
+<img src="example.png" width="200" height="200" />
