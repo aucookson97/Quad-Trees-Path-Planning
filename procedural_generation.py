@@ -21,15 +21,15 @@ class IslandGenerator():
         self.noise_arr[self.noise_arr >= threshold] = 1
         self.noise_arr[self.noise_arr < threshold] = 0
         self.map = self.noise_arr.astype(int) # 1s are land, 0s are water
-        self.map = np.repeat(self.map[...,np.newaxis], repeats=3, axis=2)
+        self.map_layer = np.repeat(self.map[...,np.newaxis], repeats=3, axis=2)
 
         # Create an image for visual purposes. TODO: Do with numpy
         img = np.zeros((self.map_size, self.map_size, 3))
-        img = np.multiply(self.map,LAND) + np.multiply(np.logical_not(self.map),WATER)
+        img = np.multiply(self.map_layer,LAND) + np.multiply(np.logical_not(self.map_layer),WATER)
         self.img = Image.fromarray(img.astype('uint8'), 'RGB')
 
 
-    def _perlin_noise(self, scale=.2, octaves=2, persistence=3, lacunarity=2.0):
+    def _perlin_noise(self, scale=.2, octaves=3, persistence=2, lacunarity=3.0):
         seed = np.random.randint(0, 100)
         noise_arr = np.zeros((self.map_size,self.map_size))
         
