@@ -83,20 +83,86 @@ class QuadTree:
         SW = 2
         SE = 3
         N = 4
-        S = 5
-        W = 6
-        E = 7
+        E = 5
+        S = 6
+        W = 7
+
 
     def __init__(self, world):
 
         self.world = world
+
         self.root = Node(name=next(count),
                          world = world,
                          top_left = (0, 0),
                          size = self.world.shape[0],
                          parent=None)
+        self.adj_truth_table = [[True, True, False, False],
+                               [False, True, False, True],
+                               [False, False, True, True],
+                               [True, False, True, False]]
 
+        self.commonside_table = [[None, self.Direction.N, self.Direction.W],
+                                       [self.Direction.N, None, None, self.Direction.E],
+                                       [self.Direction.W, None, None, self.Direction.S],
+                                       [None, self.Direction.E, self.Direction.S, None]]
 
+        self.reflect_table = [[self.Direction.SW, self.Direction.SE, self.Direction.NW, self.Direction.NE],
+                              [self.Direction.NE, self.Direction.NW, self.Direction.SE, self.Direction.SW],
+                              [self.Direction.SW, self.Direction.SE, self.Direction.NW, self.Direction.NE],
+                              [self.Direction.NE, self.Direction.NW, self.Direction.SE, self.Direction.SW]]
+    def sontype(self, node):
+        '''
+        Get the son type of node compared to its parent
+        :param node: Node class
+        :return: Type of the relationship the node has to its parent
+        '''
+        if node.parent.nw == node:
+            return self.Direction.NW
+        if node.parent.sw == node:
+            return self.Direction.SW
+        if node.parent.ne == node:
+            return self.Direction.NE
+        if node.parent.se == node:
+            return self.Direction.SE
+
+    def adj(self, orth_dir, corner_dir):
+        '''
+        :param orth_dir: direction of orthogonal (N,E,S,W)
+        :param corner_dir: direction of corner
+        :return: True or False depending on if the two inputs are adjacent
+        '''
+        return self.adj_truth_table[orth_dir-4, corner_dir]
+
+    def opquad(self, direction):
+        '''
+        :param direction: direction
+        :return: opposite of direction
+        '''
+        if direction == self.Direction.NW:
+            return self.Direction.SE
+        if direction == self.Direction.SW:
+            return self.Direction.NE
+        if direction == self.Direction.NE:
+            return self.Direction.SW
+        if direction == self.Direction.SE:
+            return self.Direction.NW
+
+    def commonside(self, dir1, dir2):
+        '''
+        :param dir1: direction 1
+        :param dir2: direction 2
+        :return: the cardinal direction both directions share
+        '''
+        return self.commonside_table[dir1, dir2]
+
+    def reflect(self, orth_dir, corner_dir):
+        '''
+        :param orth_dir: direction in N,E,S,W
+        :param corner_dir: direction in NW, NE, SW, SE
+        :return: corner direction reflected upon orth_dir
+        '''
+        return self.reflect_table[orth_dir-4,corner_dir]
     def show_tree(self, img):
         x = ImageDraw.Draw(img)
         self._show_tree(x, self.root)
@@ -109,13 +175,17 @@ class QuadTree:
 
         if node.pos is not None:
             img.point(node.pos, fill='black')
-            n_neighbor = self.find_neighbors(node, self.Direction.N)
-            if len(n_neighbor)==0:
-                img.point(node.pos,fill='pink')
-            for n in n_neighbor:
+            neighbors = []
 
+            neighbors+=self.find_neighbors(node, self.Direction.N)
+            neighbors+=self.find_neighbors(node, self.Direction.W)
+            #neighbors+=self.find_neighbors(node, self.Direction.NW)
+
+            if not len(neighbors):
+                img.point(node.pos,fill='pink')
+            for n in neighbors:
                 if n is not None and n.pos is not None:
-                    img.line([node.pos, n.pos],fill='yellow')
+                    img.line([node.pos, n.pos], fill='yellow')
         rect = (node.top_left[1], node.top_left[0], node.top_left[1] + node.size, node.top_left[0] + node.size)
         img.rectangle(rect, fill=None, outline="red")
 
@@ -123,9 +193,26 @@ class QuadTree:
         self._show_tree(img, node.ne)
         self._show_tree(img, node.sw)
         self._show_tree(img, node.se)
-            
+
+    def gtequal_adj_neighbor(self, node, direction):
+        '''
+        Uses Samet's algorithm to find the greater than or equal sized neighbors
+        in specified direction
+        :param node: source node
+        :param direction: direction to find neighbors in
+        :return: Neighbor in specified direction which is greater or equal in size
+        '''
+        if node.parent is not None and self.adj(direction, self.sontype(node)):
+            q = self.gtequal_adj_neighbor(node.parent, direction)
+        else:
+            q = node.parent
+
+        return (q.children[self.reflect(direction, self.sontype(node))]
+                if q is not None and not q.is_leaf
+                else q)
     def get_eq_or_greater_size_neighbors(self,node,direction):
         '''
+        MARKED FOR DELETE going to replaced by self.gtequal_adj_neighbor
         Gets the adjacent neighbors which are of equal or greater size in certain direction
         :param direction: direction of which to search for equal or greater size neighbors
         :return: adjacent node in specified direction
@@ -141,18 +228,53 @@ class QuadTree:
 
             temp = self.get_eq_or_greater_size_neighbors(node.parent, direction)
 
-            if temp is None:
-                return None
-            elif temp.is_leaf:
+            if temp is None or temp.is_leaf:
                 return temp
             elif node.parent.nw == node:
                 return temp.sw
             elif node.parent.ne == node:
                 return temp.se
 
-        #TODO: same thing for other directions
+        elif direction == self.Direction.W:
+            if node.is_root: #node is root
+                return None
+            if node.parent.ne == node:
+                return node.parent.nw
+            if node.parent.se == node:
+                return node.parent.sw
+
+            temp = self.get_eq_or_greater_size_neighbors(node.parent, direction)
+
+            if temp is None or temp.is_leaf:
+                return temp
+            elif node.parent.nw == node:
+                return temp.ne
+            elif node.parent.sw == node:
+                return temp.se
+
+        elif direction == self.Direction.NW:
+            if node.is_root:
+                return None
+            if node.parent.se == node:
+                return node.parent
+
+            if node.parent.nw == node:
+                temp = self.get_eq_or_greater_size_neighbors(node.parent, direction)
+            else:
+                common_side = self.Direction.N if node.parent.ne == self else self.Direction.S
+                temp = self.get_eq_or_greater_size_neighbors(node.parent, common_side)
+
+            if temp is None:
+                return None
+            elif temp.is_leaf:
+                return temp
+            elif node.parent.se == node:
+                return temp.nw
+
     def check_smaller_neighbors(self, neighbor, direction):
         '''
+        MARKED FOR REWORK going to use the helper functions adj, reflect, opquad, commonside
+        to make code look cleaner
         Check for the smaller neighbors in the specified direction
         :param neighbor: neighbor that is greater than or equal to the source node
         :param direction: direction that the neighbor is at
@@ -172,8 +294,29 @@ class QuadTree:
                     if chosen.se is not None:
                         candidates.append(chosen.se)
                 candidates.remove(chosen)
+
+        if direction == self.Direction.W:
+            while candidates:
+                chosen = candidates[0]
+                if chosen.is_leaf:
+                    neighbors.append(chosen)
+                else:
+                    if chosen.ne is not None:
+                        candidates.append(chosen.ne)
+                    if chosen.se is not None:
+                        candidates.append(chosen.se)
+                candidates.remove(chosen)
+
+        if direction == self.Direction.NW:
+            while candidates:
+                chosen = candidates[0]
+                if chosen.is_leaf:
+                    neighbors.append(chosen)
+                else:
+                    if chosen.se is not None:
+                        candidates.append(chosen.se)
         return neighbors
-        #TODO: do it for other directions
+
 
     def find_neighbors(self, node, direction):
         '''
@@ -193,12 +336,11 @@ if __name__ == "__main__":
     else:
         ig = IslandGenerator(512 ,.1)
         pickle.dump(ig,open('ig.pkl','wb+'))
-    #ig.show_map()
+    ig.show_map()
 
     tree = QuadTree(ig.map)
     img = tree.show_tree(ig.img)
 
-    #for pre, fill, node in RenderTree(tree.root):
-    #    print(node.pos)
+
 
     print('{} nodes in the tree'.format(next(count)))
