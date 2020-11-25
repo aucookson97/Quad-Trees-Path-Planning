@@ -10,6 +10,8 @@ from anytree import NodeMixin, RenderTree
 from procedural_generation import IslandGenerator
 from PIL import Image, ImageDraw
 from enum import Enum
+import pickle
+import os
 
 def counter():
     count = 0
@@ -68,7 +70,8 @@ class Node(NodeMixin):
                                size = new_size,
                                parent = self)
                 self.children += (self.se,)
-        elif np.min(world_slice) == np.max(world_slice):
+
+        elif not np.any(world_slice):
             self.pos = center
 
 
@@ -95,19 +98,27 @@ class QuadTree:
 
 
     def show_tree(self, img):
-        
-        self._show_tree(ImageDraw.Draw(img), self.root)
+        x = ImageDraw.Draw(img)
+        self._show_tree(x, self.root)
         img.show()
-        
+        return x
         
     def _show_tree(self, img, node):
         if not node:
             return
-        print(node.parent)
+
+        if node.pos is not None:
+            img.point(node.pos, fill='black')
+            n_neighbor = self.find_neighbors(node, self.Direction.N)
+            if len(n_neighbor)==0:
+                img.point(node.pos,fill='pink')
+            for n in n_neighbor:
+
+                if n is not None and n.pos is not None:
+                    img.line([node.pos, n.pos],fill='yellow')
         rect = (node.top_left[1], node.top_left[0], node.top_left[1] + node.size, node.top_left[0] + node.size)
         img.rectangle(rect, fill=None, outline="red")
-        if node.pos:
-            img.point(node.pos,fill='black')
+
         self._show_tree(img, node.nw)
         self._show_tree(img, node.ne)
         self._show_tree(img, node.sw)
@@ -119,28 +130,75 @@ class QuadTree:
         :param direction: direction of which to search for equal or greater size neighbors
         :return: adjacent node in specified direction
         '''
+        assert node != None,'SOmething wrong'
         if direction == self.Direction.N:
-            if self.parent is None:
+            if node.is_root: #node is root
                 return None
             if node.parent.sw == node:
                 return node.parent.nw
             if node.parent.se == node:
                 return node.parent.ne
 
-            temp_node = self.get_eq_or_greater_size_neighbors(node.parent,direction)
-            if temp_node is None or temp_node.is_leaf:
-                return (temp_node.sw
-                        if node.parent.nw == node
-                        else temp_node.se)
+            temp = self.get_eq_or_greater_size_neighbors(node.parent, direction)
+
+            if temp is None:
+                return None
+            elif temp.is_leaf:
+                return temp
+            elif node.parent.nw == node:
+                return temp.sw
+            elif node.parent.ne == node:
+                return temp.se
+
         #TODO: same thing for other directions
+    def check_smaller_neighbors(self, neighbor, direction):
+        '''
+        Check for the smaller neighbors in the specified direction
+        :param neighbor: neighbor that is greater than or equal to the source node
+        :param direction: direction that the neighbor is at
+        :return: iterable of smaller neighbors that are in the specified direction
+        '''
+
+        candidates = [] if neighbor is None else [neighbor]
+        neighbors = []
+        if direction == self.Direction.N:
+            while candidates:
+                chosen = candidates[0]
+                if chosen.is_leaf:
+                    neighbors.append(chosen)
+                else:
+                    if chosen.sw is not None:
+                        candidates.append(chosen.sw)
+                    if chosen.se is not None:
+                        candidates.append(chosen.se)
+                candidates.remove(chosen)
+        return neighbors
+        #TODO: do it for other directions
+
+    def find_neighbors(self, node, direction):
+        '''
+        Finds all the neighbors adjacent to node in specified direction
+        :param node: source node of which we are trying to find its neighbors
+        :param direction: direction of which to find its neighbors
+        :return: iterable of neighbors in specified direction
+        '''
+        neighbor = self.get_eq_or_greater_size_neighbors(node,direction)
+
+        neighbors = self.check_smaller_neighbors(neighbor,direction)
+        return neighbors
 
 if __name__ == "__main__":
-    ig = IslandGenerator(512, .1)
-    ig.show_map()
-    tree = QuadTree(ig.map)
-    tree.show_tree(ig.img)
+    if os.path.isfile('ig.pkl'):
+        ig = pickle.load(open('ig.pkl','rb'))
+    else:
+        ig = IslandGenerator(512 ,.1)
+        pickle.dump(ig,open('ig.pkl','wb+'))
+    #ig.show_map()
 
-    for pre, fill, node in RenderTree(tree.root):
-        print("%s%s" % (pre, node.pos))
+    tree = QuadTree(ig.map)
+    img = tree.show_tree(ig.img)
+
+    #for pre, fill, node in RenderTree(tree.root):
+    #    print(node.pos)
 
     print('{} nodes in the tree'.format(next(count)))
