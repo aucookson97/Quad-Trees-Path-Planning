@@ -29,7 +29,7 @@ class IslandGenerator():
         self.img = Image.fromarray(img.astype('uint8'), 'RGB')
 
 
-    def _perlin_noise(self, scale=.2, octaves=1, persistence=1, lacunarity=1.0):
+    def _perlin_noise(self, scale=.2, octaves=1, persistence=1, lacunarity=2.0):
         seed = np.random.randint(0, 100)
         noise_arr = np.zeros((self.map_size,self.map_size))
         
