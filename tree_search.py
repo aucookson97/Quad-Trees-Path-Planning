@@ -1,5 +1,5 @@
 import os
-os.chdir(r'C:\Users\chang\OneDrive\Desktop\209 AS robos\Project\Quad-Trees-Path-Planning')
+# os.chdir(r'C:\Users\chang\OneDrive\Desktop\209 AS robos\Project\Quad-Trees-Path-Planning')
 from PIL import Image, ImageDraw
 import pickle
 import numpy as np
@@ -33,7 +33,7 @@ class A_star:
         :param node:
         :return: h, the heuristic cost of getting from node to goal node
         '''
-        return np.linalg.norm((np.array(node.pos)-np.array(self.goal_node.pos)))
+        return abs(node.pos[0] - self.goal_node.pos[0]) + abs(node.pos[1] - self.goal_node.pos[1])
 
     def _get_cost(self, node):
         '''
@@ -51,7 +51,7 @@ class A_star:
         '''
 
         while self.open_list:
-            self.open_list.sort(key=self._get_cost, reverse = True)
+            self.open_list.sort(key=lambda node: self._get_cost(node), reverse=True)
             current_node = self.open_list.pop()
 
             self.closed_list.add(current_node)
@@ -69,35 +69,40 @@ class A_star:
                     if neigh.Astar_parent is None:
                        neigh.Astar_parent = current_node   
                     
-                    neigh.g = current_node.f + np.linalg.norm(np.array(current_node.pos) - np.array(neigh.pos))
+                    neigh.g = current_node.g + abs(current_node.pos[0] - neigh.pos[0]) + abs(current_node.pos[1] - neigh.pos[1])
                     neigh.f = neigh.g + self._dist_h(neigh)
                     
-                    if neigh in self.open_list:
-                        index = self.open_list.index(neigh)
-                        self.open_list[index] = neigh
-                        
-                    else:
+                    if self._add_to_open_list(neigh):
                         self.open_list.append(neigh)
-                    
-             #       print(len(self.open_list))
-                    
-        path = []
-        
+                    # if neigh in self.open_list:
+                    #     index = self.open_list.index(neigh)
+                    #     self.open_list[index] = neigh
+                        
+                    # else:
+                    #     self.open_list.append(neigh)
+
+
+
+        # Reconstruct path backwards                
+        path = []      
         while current_node != self.start_node:
-            #print(current_node.pos)
             path.append(current_node)
-            current_node = current_node.Astar_parent #quadtree is different from A* parent... 
+            current_node = current_node.Astar_parent #quadtree is different from A* parent
 
         path.append(self.start_node)
         return path[::-1]
-                    
+
+    def _add_to_open_list(self, node_to_add):
+        for node in self.open_list:
+            if node_to_add == node and node_to_add.f >= node.f:
+                return False
+        return True
     
     def motion_plan(self, A_map, path):
         
         for i in range(len(path)-1):
-            A_map.line((path[i].pos, path[i+1].pos), fill = "black")
-        
-            
+            A_map.line((tuple(path[i].pos), tuple(path[i+1].pos)), fill = "black")
+             
         return A_map
             
         
@@ -109,17 +114,23 @@ if __name__ == "__main__":
        # pickle.dump(ig,open('ig.pkl','wb+'))
     # ig.show_map()
     
-    tree = QuadTree(ig.map)
-    img = tree.show_tree(ig.img)
-    print(ig.img)
+    start = [33, 95]
 
+    # Several good goals for this map
+    goal1 = [496, 81]
+    goal2 = [480, 225]
+    goal3 = [336, 400]
+
+    tree = QuadTree(ig.map, start, goal3)
+    img_draw = tree.draw_tree(ig.img)
     
     Astar = A_star(tree)
     path = Astar.run()
     
-    Astar.motion_plan(img, path)
+    Astar.motion_plan(img_draw, path)
     
     ig.img.show()
+    # ig.img.save('map1.png')
 
 
     

@@ -5,12 +5,12 @@ Created on Fri Nov 20 20:27:02 2020
 @author: aidan
 """
 import os
-os.chdir(r'C:\Users\chang\OneDrive\Desktop\209 AS robos\Project\Quad-Trees-Path-Planning')
+# os.chdir(r'C:\Users\chang\OneDrive\Desktop\209 AS robos\Project\Quad-Trees-Path-Planning')
 
 import numpy as np
 from anytree import NodeMixin, RenderTree
 from procedural_generation import IslandGenerator
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from enum import Enum
 import pickle
 
@@ -36,7 +36,6 @@ class Node(NodeMixin):
         # costs for A* algorithm
         self.f = 0
         self.g = 0
-        self.h = 0
         new_size = int(size / 2)
         center = (top_left[1] + new_size, top_left[0] + new_size)
 
@@ -55,7 +54,7 @@ class Node(NodeMixin):
                 self.children += (child,)
 
         elif not np.any(world_slice):
-            self.pos = center
+            self.pos = np.array(center)
 
 
 class QuadTree:
@@ -71,7 +70,7 @@ class QuadTree:
         W = 7
 
 
-    def __init__(self, world):
+    def __init__(self, world, start, goal):
         self.world = world
 
         self.root = Node(name=next(count),
@@ -94,9 +93,10 @@ class QuadTree:
                               [self.Direction.SW, self.Direction.SE, self.Direction.NW, self.Direction.NE],
                               [self.Direction.NE, self.Direction.NW, self.Direction.SE, self.Direction.SW]]
         
-        self.start_node = self.get_closest_node([33, 95])
-        self.goal_node = self.get_closest_node([496, 81])
-    def sontype(self, node):
+        self.start_node = self.get_closest_node(start)
+        self.goal_node = self.get_closest_node(goal)
+
+    def get_child_type(self, node):
         '''
         Get the son type of node compared to its parent
         :param node: Node class
@@ -143,11 +143,32 @@ class QuadTree:
         '''
         return self.reflect_table[orth_dir.value-4][corner_dir.value]
 
-    def show_tree(self, img):
-        x = ImageDraw.Draw(img)
-        self._show_tree(x, self.root)
-        img.show()
-        return x
+    def draw_tree(self, img):
+        img_draw = ImageDraw.Draw(img)
+        self._show_tree(img_draw, self.root)
+        self._draw_start_and_goal(img, img_draw)
+        return img_draw
+
+    def _draw_start_and_goal(self, img, draw):
+        # Draw start and goal
+        def _draw_circle(draw, center, radius, color):
+            x, y = center
+            top_left = (x-radius, y-radius)
+            bottom_right = (x+radius, y+radius)
+            draw.ellipse((top_left, bottom_right), fill=color)
+
+        font = ImageFont.truetype("arial.ttf", 14, encoding="unic")
+        node_size = int(img.size[0] / 150) # Scale node circle size based on size of image
+
+        _draw_circle(draw, self.start_node.pos, node_size, '#db09b5')
+        w, h = draw.textsize('Start', font=font)
+        start_text_pos = (int(self.start_node.pos[0] - w / 2), int(self.start_node.pos[1] - h - 5))
+        draw.text(start_text_pos, 'Start', fill='black', font=font) # Anchor is not working, so had to use fontmetrics
+
+        _draw_circle(draw, self.goal_node.pos, node_size, '#db09b5')
+        w, h = draw.textsize('Goal', font=font)
+        goal_text_pos = (int(self.goal_node.pos[0] - w / 2), int(self.goal_node.pos[1] - h - 5))
+        draw.text(goal_text_pos, 'Goal', fill='black', font=font)
         
     def _show_tree(self, img, node):
         if not node:
@@ -165,7 +186,7 @@ class QuadTree:
                 img.point(node.pos,fill='pink')
             for n in neighbors:
                 if n.pos is not None:
-                    img.line([node.pos, n.pos], fill='yellow')
+                    img.line((tuple(node.pos), tuple(n.pos)), fill='yellow')
         rect = (node.top_left[1], node.top_left[0], node.top_left[1] + node.size, node.top_left[0] + node.size)
         img.rectangle(rect, fill=None, outline="red")
 
@@ -176,7 +197,7 @@ class QuadTree:
         self._show_tree(img, node.sw)
         self._show_tree(img, node.se)'''
 
-    def gtequal_adj_neighbor(self, node, direction):
+    def get_equal_adj_neighbor(self, node, direction):
         '''
         Uses Samet's algorithm to find the greater than or equal sized neighbors
         in specified direction
@@ -184,16 +205,16 @@ class QuadTree:
         :param direction: direction to find neighbors in
         :return: Neighbor in specified direction which is greater or equal in size
         '''
-        if node.parent is not None and self.adj(direction, self.sontype(node)):
-            q = self.gtequal_adj_neighbor(node.parent, direction)
+        if node.parent is not None and self.adj(direction, self.get_child_type(node)):
+            q = self.get_equal_adj_neighbor(node.parent, direction)
         else:
             q = node.parent
 
         return (q
                 if q is None or q.is_leaf
-                else q.children[self.reflect(direction, self.sontype(node)).value])
+                else q.children[self.reflect(direction, self.get_child_type(node)).value])
 
-    def gt_corner_neighbor(self, node, direction):
+    def get_corner_neighbor(self, node, direction):
         '''
         Uses Samet's algorithm to find the greater than or equal sized neighbors
         in specified direction
@@ -201,17 +222,17 @@ class QuadTree:
         :param direction: direction to find neighbors in
         :return: Neighbor in specified direction which is greater or equal in size
         '''
-        if node.parent is not None and self.sontype(node) != self.opquad(direction):
-            if self.sontype(node) == direction:
-                q = self.gt_corner_neighbor(node.parent, direction)
+        if node.parent is not None and self.get_child_type(node) != self.opquad(direction):
+            if self.get_child_type(node) == direction:
+                q = self.get_corner_neighbor(node.parent, direction)
             else:
-                q = self.gtequal_adj_neighbor(node.parent, self.commonside(self.sontype(node), direction))
+                q = self.get_equal_adj_neighbor(node.parent, self.commonside(self.get_child_type(node), direction))
         else:
             q = node.parent
 
         return (q
                 if q is None or q.is_leaf
-                else q.children[self.opquad(self.sontype(node)).value])
+                else q.children[self.opquad(self.get_child_type(node)).value])
 
     def check_smaller_neighbors(self, neighbor, direction):
         '''
@@ -247,9 +268,9 @@ class QuadTree:
         :return: iterable of neighbors in specified direction
         '''
         if direction.value >= 4:
-            neighbor = self.gtequal_adj_neighbor(node, direction)
+            neighbor = self.get_equal_adj_neighbor(node, direction)
         else:
-            neighbor = self.gt_corner_neighbor(node, direction)
+            neighbor = self.get_corner_neighbor(node, direction)
         neighbors = self.check_smaller_neighbors(neighbor, direction)
         return neighbors
 
@@ -258,7 +279,7 @@ class QuadTree:
         lowest_distance = np.Inf
         closest_node = None
         
-        for pre, _, node in RenderTree(self.root):
+        for _, _, node in RenderTree(self.root):
             if node.pos is None:
                 continue
             
@@ -268,7 +289,6 @@ class QuadTree:
                 closest_node = node
                 lowest_distance = dist
                 
-        print(closest_node.pos)
         return closest_node
     
 
@@ -280,13 +300,15 @@ if __name__ == "__main__":
         pickle.dump(ig, open('ig.pkl','wb+'))
     # ig.show_map()
     
-    tree = QuadTree(ig.map)
-    img = tree.show_tree(ig.img)
-    ig.img.save('map_pic.jpg')
+    tree = QuadTree(ig.map, [33, 95], [496, 81])
+    img = tree.draw_tree(ig.img)
+    # ig.img.save('map_pic.jpg')
     
     tree.get_closest_node([33, 95])
     
     tree.get_closest_node([496, 81])
+
+    ig.img.show()
     
 
     print('{} nodes in the tree'.format(next(count)))
