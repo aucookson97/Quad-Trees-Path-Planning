@@ -4,6 +4,8 @@ Created on Fri Nov 20 20:27:02 2020
 
 @author: aidan
 """
+import os
+os.chdir(r'C:\Users\chang\OneDrive\Desktop\209 AS robos\Project\Quad-Trees-Path-Planning')
 
 import numpy as np
 from anytree import NodeMixin, RenderTree
@@ -11,7 +13,8 @@ from procedural_generation import IslandGenerator
 from PIL import Image, ImageDraw
 from enum import Enum
 import pickle
-import os
+
+
 
 def counter():
     count = 0
@@ -28,7 +31,8 @@ class Node(NodeMixin):
         self.nw = self.ne = self.sw = self.se = None
         self.top_left = top_left
         self.size = size
-
+        
+        self.Astar_parent = None
         # costs for A* algorithm
         self.f = 0
         self.g = 0
@@ -40,7 +44,7 @@ class Node(NodeMixin):
 
         world_slice = world[top_left[0]: top_left[0] + size, top_left[1]: top_left[1] + size]
 
-        if np.min(world_slice) != np.max(world_slice) and size >= 0:
+        if np.min(world_slice) != np.max(world_slice) and size >= 8:
             # (NW, NE, SE, SW)
             for new_top_left in [top_left, (top_left[0], center[0]), (center[1], top_left[1]), (center[1], center[0])]:
                 child = Node(name=next(count),
@@ -68,7 +72,6 @@ class QuadTree:
 
 
     def __init__(self, world):
-
         self.world = world
 
         self.root = Node(name=next(count),
@@ -90,6 +93,9 @@ class QuadTree:
                               [self.Direction.NE, self.Direction.NW, self.Direction.SE, self.Direction.SW],
                               [self.Direction.SW, self.Direction.SE, self.Direction.NW, self.Direction.NE],
                               [self.Direction.NE, self.Direction.NW, self.Direction.SE, self.Direction.SW]]
+        
+        self.start_node = self.get_closest_node([33, 95])
+        self.goal_node = self.get_closest_node([496, 81])
     def sontype(self, node):
         '''
         Get the son type of node compared to its parent
@@ -247,18 +253,40 @@ class QuadTree:
         neighbors = self.check_smaller_neighbors(neighbor, direction)
         return neighbors
 
+    def get_closest_node(self, node_position):
+    
+        lowest_distance = np.Inf
+        closest_node = None
+        
+        for pre, _, node in RenderTree(self.root):
+            if node.pos is None:
+                continue
+            
+            dist = np.linalg.norm(np.array(node_position) - np.array(node.pos))
+            if lowest_distance > dist:
+                
+                closest_node = node
+                lowest_distance = dist
+                
+        print(closest_node.pos)
+        return closest_node
+    
 
 if __name__ == "__main__":
     if os.path.isfile('ig.pkl'):
         ig = pickle.load(open('ig.pkl','rb'))
     else:
         ig = IslandGenerator(512 ,.07)
-        pickle.dump(ig,open('ig.pkl','wb+'))
+        pickle.dump(ig, open('ig.pkl','wb+'))
     # ig.show_map()
-
+    
     tree = QuadTree(ig.map)
     img = tree.show_tree(ig.img)
-
-
+    ig.img.save('map_pic.jpg')
+    
+    tree.get_closest_node([33, 95])
+    
+    tree.get_closest_node([496, 81])
+    
 
     print('{} nodes in the tree'.format(next(count)))
