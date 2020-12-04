@@ -34,8 +34,8 @@ class Node(NodeMixin):
         
         self.Astar_parent = None
         # costs for A* algorithm
-        self.f = 0
-        self.g = 0
+        self.f = np.Inf
+        self.g = np.Inf
         new_size = int(size / 2)
         center = (top_left[1] + new_size, top_left[0] + new_size)
 
@@ -54,6 +54,7 @@ class Node(NodeMixin):
                 self.children += (child,)
 
         elif not np.any(world_slice):
+            #heuristic = np.linalg.norm()
             self.pos = np.array(center)
 
 
@@ -95,6 +96,20 @@ class QuadTree:
         
         self.start_node = self.get_closest_node(start)
         self.goal_node = self.get_closest_node(goal)
+        self.prune_heuristic()
+
+    def prune_heuristic(self):
+        '''
+        Prunes quadtree nodes based on heuristic
+        Distance from start and goal nodes
+        :return: None
+        '''
+        cost_threshold = np.sum(np.square(self.goal_node.pos-self.start_node.pos))+np.square(310)
+        for _, _, node in RenderTree(self.root):
+            if node.pos is not None:
+                node_cost = np.sum(np.square(node.pos - self.start_node.pos)) + np.sum(np.square(node.pos - self.goal_node.pos))
+                if node_cost >= cost_threshold:
+                    node.pos = None
 
     def get_child_type(self, node):
         '''
