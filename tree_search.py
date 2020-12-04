@@ -24,8 +24,7 @@ class A_star:
         self.start_node.f = 0
         self.open_list.append(self.start_node)
         
-        
-        
+
     def _dist_h(self, node):
         '''
         In defining the cost of a node f = g + h
@@ -34,11 +33,11 @@ class A_star:
         :return: h, the heuristic cost of getting from node to goal node
         '''
         return abs(node.pos[0] - self.goal_node.pos[0]) + abs(node.pos[1] - self.goal_node.pos[1])
-
+        #return np.square(node.pos[0] - self.goal_node.pos[0]) + np.square(node.pos[1] - self.goal_node.pos[1])
     def _get_cost(self, node):
         '''
         Returns cost of node
-        :param node: Tuple of (node, cost)
+        :param node: node class from quadtrees.py
         :return: cost
         '''
         
@@ -57,8 +56,9 @@ class A_star:
             self.closed_list.add(current_node)
 
             if current_node == self.goal_node:
-                break
-            
+                path = self._reconstruct_path(current_node)
+                return path
+
             for direction in self.quadtree.Direction:
                 neighbors = self.quadtree.find_neighbors(current_node, direction)
                 for neigh in neighbors:
@@ -70,9 +70,10 @@ class A_star:
                        neigh.Astar_parent = current_node   
                     
                     neigh.g = current_node.g + abs(current_node.pos[0] - neigh.pos[0]) + abs(current_node.pos[1] - neigh.pos[1])
+                    #neigh.g = current_node.g + np.square(current_node.pos[0] - neigh.pos[0]) + np.square(current_node.pos[1] - neigh.pos[1])
                     neigh.f = neigh.g + self._dist_h(neigh)
                     
-                    if self._add_to_open_list(neigh):
+                    if self._add_to_open_list(neigh): #dont we need to replace if neigh.f is lower than exisitng neigh.f if we find existing neigh.f in open_list
                         self.open_list.append(neigh)
                     # if neigh in self.open_list:
                     #     index = self.open_list.index(neigh)
@@ -81,16 +82,16 @@ class A_star:
                     # else:
                     #     self.open_list.append(neigh)
 
+            return None
+        def _reconstruct_path(self, current_node):
+            # Reconstruct path backwards
+            path = []
+            while current_node != self.start_node:
+                path.append(current_node)
+                current_node = current_node.Astar_parent #quadtree is different from A* parent
 
-
-        # Reconstruct path backwards                
-        path = []      
-        while current_node != self.start_node:
-            path.append(current_node)
-            current_node = current_node.Astar_parent #quadtree is different from A* parent
-
-        path.append(self.start_node)
-        return path[::-1]
+            path.append(self.start_node)
+            return path[::-1]
 
     def _add_to_open_list(self, node_to_add):
         for node in self.open_list:
@@ -120,14 +121,16 @@ if __name__ == "__main__":
     goal1 = [496, 81]
     goal2 = [480, 225]
     goal3 = [336, 400]
+    goal4 = [0,512] #impossible node
 
-    tree = QuadTree(ig.map, start, goal3)
+    tree = QuadTree(ig.map, start, goal2)
     img_draw = tree.draw_tree(ig.img)
     
     Astar = A_star(tree)
     path = Astar.run()
-    
-    Astar.motion_plan(img_draw, path)
+
+    if path is not None:
+        Astar.motion_plan(img_draw, path)
     
     ig.img.show()
     # ig.img.save('map1.png')
