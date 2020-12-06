@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 from enum import Enum
 import pickle
 
-MIN_RESOLUTION = 32    # Smallest Node
+MIN_RESOLUTION = 8    # Smallest Node
 
 def counter():
     count = 0
@@ -76,6 +76,12 @@ class Node(NodeMixin):
         elif not np.any(world_slice):
             #heuristic = np.linalg.norm()
             self.pos = np.array(center)
+
+    def reset(self):
+        self.Astar_parent = None
+        # costs for A* algorithm
+        self.f = np.Inf
+        self.g = np.Inf
 
 
 class QuadTree:
@@ -211,8 +217,8 @@ class QuadTree:
             return
         if node.pos is not None:
             # img.point(node.pos, fill='black')
-            color = 'green' if node.is_valid else 'red'
-            self._draw_circle(img, node.pos, 5, color=color)
+            # color = 'green' if node.is_valid else 'red'
+            # self._draw_circle(img, node.pos, 5, color=color)
             neighbors = []
             neighbors += self.find_neighbors(node, self.Direction.N)
             neighbors += self.find_neighbors(node, self.Direction.W)

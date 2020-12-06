@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 
 RANGE = 100 # How far the boat can "see"
-TIME_STEP_LENGTH = 1000 # In milliseconds
+TIME_STEP_LENGTH = 200 # In milliseconds
 
 FOG_COLOR = (197, 207, 209, 0)
 BOAT_COLOR = (255, 255, 255)# (158, 0, 142)
@@ -26,13 +26,23 @@ class AStarDynamic:
         self.closed_list = set()
         self.quadtree = quadtree
 
+        self.reset_tree()
+
         self.start_node = quadtree.start_node
         self.goal_node = quadtree.goal_node
 
         self.start_node.f = 0
         self.start_node.g = 0
         self.open_list.append(self.start_node)
+
+    def reset_tree(self):
         
+        def _iterate_tree(node):
+            node.reset()
+            for child in node.children:
+                _iterate_tree(child)
+        
+        _iterate_tree(self.quadtree.root)
 
     def _dist_h(self, node):
         '''
@@ -58,7 +68,6 @@ class AStarDynamic:
         Runs the A* algorithm to find optimal path from start to end node
         :return: list of nodes defining path from start to goal node
         '''
-
         while self.open_list:
             self.open_list.sort(key=lambda node: self._get_cost(node), reverse=True)
             current_node = self.open_list.pop()
@@ -121,7 +130,7 @@ class AStarDynamic:
 
 class Obstacle:
 
-    CHANCE_TO_STAY_STILL = .75 # 0-1
+    CHANCE_TO_STAY_STILL = .7 # 0-1
 
     def __init__(self, tree, start_node):
         self.tree = tree
@@ -211,12 +220,22 @@ class SimulateTravel:
                 obstacle.move(current_node, self.goal_node)
 
             # Re-run A star with moved obstacles and from the current position
-            #self.tree.start_node = current_node
-
+            self.tree.start_node = current_node
             Astar = AStarDynamic(self.tree)
             path = Astar.run()
 
             self.update_mask(current_node.pos)
+
+            # self.is_not_valid_count = 0
+            # def _iterate_tree(node):
+
+            #     if not node.is_valid:
+            #         self.is_not_valid_count += 1
+            #     for child in node.children:
+            #         _iterate_tree(child)
+
+            # _iterate_tree(self.tree.root)
+            # print (self.is_not_valid_count)
 
             if path:
 
@@ -249,7 +268,7 @@ class SimulateTravel:
             self.fig.canvas.draw_idle()
             plt.pause(TIME_STEP_LENGTH / 1000)
             found_goal = (current_node == self.goal_node)
-            _= input("press enter")
+            # _= input("press enter")
             step += 1
 
         return full_path
@@ -288,7 +307,7 @@ if __name__ == "__main__":
     goal3 = [336, 400]
     goal4 = [0,512] #impossible node
 
-    path = SimulateTravel(ig, start, goal2, 25, fog=False)
+    path = SimulateTravel(ig, start, goal3, 50, fog=False)
 
 
     # ig.img.save('map1.png')
