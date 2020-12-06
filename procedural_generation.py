@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 LAND = (8, 150, 27)
-WATER = (37, 106, 217) 
+WATER = (98, 193, 245)# (37, 106, 217) 
 
 
 class IslandGenerator():
