@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 
 RANGE = 100 # How far the boat can "see"
-TIME_STEP_LENGTH = 200 # In milliseconds
+TIME_STEP_LENGTH = 100 # In milliseconds
 
 FOG_COLOR = (197, 207, 209, 0)
 BOAT_COLOR = (255, 255, 255)# (158, 0, 142)
@@ -194,8 +194,22 @@ class SimulateTravel:
         self.img_draw = ImageDraw.Draw(self.img)
         self.mask_draw = ImageDraw.Draw(self.mask)
 
+        # Initial Frame
         self.window = plt.imshow(self.img)
+        img_new = self.img.copy()
+        self.draw_boat(img_new, self.start_node.pos, 16, 'white')
+
+        # Draw Obstacles (Cant be combined with above loop)
+        for obstacle in self.obstacles:
+            if not self.fog or (obstacle.seen or self.fog and (np.square(obstacle.current_node.pos[0] - self.start_node.pos[0]) + \
+                                                                    np.square(obstacle.current_node.pos[1] - self.start_node.pos[1])) < RANGE**2):
+                self.draw_boat(img_new, obstacle.get_pos())
+
+        # Update MATLAB Plot 
+        self.window.set_data(np.array(img_new))
         self.fig.canvas.draw_idle()
+        plt.pause(10)
+        # _ = input('Press Enter to Start.')
         self.simulate()
         _ = input('Press Enter to Close.')
 
@@ -210,9 +224,8 @@ class SimulateTravel:
         found_goal = False
 
         full_path = [current_node]
-
         while not found_goal: 
-            print ('Step {}'.format(step+1))  
+            print ('Step {}'.format(step))  
 
             # Move Obstacles
             #self.tree = QuadTree(ig.map, current_node.pos, self.goal)
@@ -269,6 +282,7 @@ class SimulateTravel:
             plt.pause(TIME_STEP_LENGTH / 1000)
             found_goal = (current_node == self.goal_node)
             # _= input("press enter")
+
             step += 1
 
         return full_path
@@ -307,7 +321,7 @@ if __name__ == "__main__":
     goal3 = [336, 400]
     goal4 = [0,512] #impossible node
 
-    path = SimulateTravel(ig, start, goal3, 50, fog=False)
+    path = SimulateTravel(ig, start, goal1, 20, fog=False)
 
 
     # ig.img.save('map1.png')

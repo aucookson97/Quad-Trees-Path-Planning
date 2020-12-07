@@ -1,12 +1,21 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Nov 20 20:27:02 2020
+
+@author: aidan
+"""
 import os
 # os.chdir(r'C:\Users\chang\OneDrive\Desktop\209 AS robos\Project\Quad-Trees-Path-Planning')
 
 import numpy as np
 from anytree import NodeMixin, RenderTree
+from minimum_resolution_quadtree import QuadTreeOptimizer
 from procedural_generation import IslandGenerator
 from PIL import Image, ImageDraw, ImageFont
 from enum import Enum
 import pickle
+
+MIN_RESOLUTION = 8    # Smallest Node allowed
 
 def counter():
     count = 0
@@ -16,44 +25,54 @@ def counter():
 
 count = counter()
 
-MIN_RESOLUTION = 8
-
 class Node(NodeMixin):
-    def __init__(self, name=None, world=None, top_left=None, size=None, parent=None, children=None, start=None, goal=None):
+    def __init__(self, name=None, world=None, top_left=None, size=None, parent=None, children=None):
         super(Node, self).__init__()
         self.name = name
+
         self.nw = self.ne = self.sw = self.se = None
         self.top_left = top_left
         self.size = size
+
+        self.is_valid = True # Keeps track of obstacles
         
         self.Astar_parent = None
         # costs for A* algorithm
-        self.is_valid = True
-
         self.f = np.Inf
         self.g = np.Inf
         new_size = int(size / 2)
         center = (top_left[1] + new_size, top_left[0] + new_size)
-        start_node_cost = np.sqrt(np.square(center[0]-start[0])+ np.square(center[1]-start[1]))
-        goal_node_cost = np.sqrt(np.square(center[0] - goal[0])+ np.square(center[1] - goal[1]))
-        node_cost = start_node_cost + goal_node_cost
 
-        split = (start_node_cost <= 200 or goal_node_cost <= 200 or node_cost <= 700)
         self.pos = None
 
         world_slice = world[top_left[0]: top_left[0] + size, top_left[1]: top_left[1] + size]
 
-        if np.min(world_slice) != np.max(world_slice) and size >= MIN_RESOLUTION and split:
+        if np.min(world_slice) != np.max(world_slice) and size >= MIN_RESOLUTION:
             # (NW, NE, SE, SW)
             for new_top_left in [top_left, (top_left[0], center[0]), (center[1], top_left[1]), (center[1], center[0])]:
                 child = Node(name=next(count),
                             world=world,
                             top_left=new_top_left,
                             size=new_size,
-                            parent=self,
-                            start=start,
-                            goal=goal)
-                self.children += (child,)
+                            parent=self)
+
+                # Add a frame of nodes
+                # frame = [child]
+
+                # if new_size > MIN_RESOLUTION:
+                #     for x in range(new_top_left[1], new_top_left[1] + new_size, MIN_RESOLUTION):
+                #         top_left_top = (new_top_left[0], x)
+                #         top_left_bottom = (new_top_left[0] + new_size - MIN_RESOLUTION, x)
+                #         frame.append(Node(name=next(count), world=world, top_left=top_left_top, size=MIN_RESOLUTION))
+                #         frame.append(Node(name=next(count), world=world, top_left=top_left_bottom, size=MIN_RESOLUTION))
+                #     for y in range(new_top_left[0] + MIN_RESOLUTION, new_top_left[0] + new_size - MIN_RESOLUTION, MIN_RESOLUTION):
+                #         top_left_left = (y, new_top_left[1])
+                #         top_left_right = (y, new_top_left[1] + new_size)
+                #         frame.append(Node(name=next(count), world=world, top_left=top_left_left, size=MIN_RESOLUTION))
+                #         frame.append(Node(name=next(count), world=world, top_left=top_left_right, size=MIN_RESOLUTION))
+                # self.children += tuple(frame)
+                self.children += (child, )
+
 
         elif not np.any(world_slice):
             #heuristic = np.linalg.norm()
@@ -79,18 +98,14 @@ class QuadTree:
         W = 7
 
 
-    def __init__(self, world, start, goal, min_resolution=8):
-        global MIN_RESOLUTION
+    def __init__(self, world, start, goal):
         self.world = world
-        MIN_RESOLUTION = min_resolution
-
         self.root = Node(name=next(count),
                          world = world,
                          top_left = (0, 0),
                          size = self.world.shape[0],
-                         parent=None,
-                         start=start,
-                         goal=goal)
+                         parent=None)
+
         self.adj_truth_table = [[True, True, False, False],
                                 [False, True, False, True],
                                 [False, False, True, True],
@@ -108,7 +123,7 @@ class QuadTree:
         
         self.start_node = self.get_closest_node(start)
         self.goal_node = self.get_closest_node(goal)
-        #self.prune_heuristic()
+        # self.prune_heuristic()
 
     def prune_heuristic(self):
         '''
@@ -172,39 +187,40 @@ class QuadTree:
 
     def draw_tree(self, img):
         img_draw = ImageDraw.Draw(img)
-        self._show_tree(img_draw, self.root)
+        self._draw_tree(img_draw, self.root)
         self._draw_start_and_goal(img, img_draw)
         return img_draw
 
+    def _draw_circle(self, draw, center, radius, color):
+        x, y = center
+        top_left = (x-radius, y-radius)
+        bottom_right = (x+radius, y+radius)
+        draw.ellipse((top_left, bottom_right), fill=color)
+
     def _draw_start_and_goal(self, img, draw):
         # Draw start and goal
-        def _draw_circle(draw, center, radius, color):
-            x, y = center
-            top_left = (x-radius, y-radius)
-            bottom_right = (x+radius, y+radius)
-            draw.ellipse((top_left, bottom_right), fill=color)
 
         font = ImageFont.truetype("arial.ttf", 14, encoding="unic")
-        node_size = int(img.size[0] / 150) # Scale node circle size based on size of image
+        node_size = int(img.size[0] / 75) # Scale node circle size based on size of image
 
-        _draw_circle(draw, self.start_node.pos, node_size, '#db09b5')
+        self._draw_circle(draw, self.start_node.pos, node_size, '#db09b5')
         w, h = draw.textsize('Start', font=font)
         start_text_pos = (int(self.start_node.pos[0] - w / 2), int(self.start_node.pos[1] - h - 5))
         draw.text(start_text_pos, 'Start', fill='black', font=font) # Anchor is not working, so had to use fontmetrics
 
-        _draw_circle(draw, self.goal_node.pos, node_size, '#db09b5')
+        self._draw_circle(draw, self.goal_node.pos, node_size, '#db09b5')
         w, h = draw.textsize('Goal', font=font)
         goal_text_pos = (int(self.goal_node.pos[0] - w / 2), int(self.goal_node.pos[1] - h - 5))
         draw.text(goal_text_pos, 'Goal', fill='black', font=font)
         
-    def _show_tree(self, img, node):
+    def _draw_tree(self, img, node):
         if not node:
             return
-
         if node.pos is not None:
-            img.point(node.pos, fill='black')
+            # img.point(node.pos, fill='black')
+            # color = 'green' if node.is_valid else 'red'
+            # self._draw_circle(img, node.pos, 5, color=color)
             neighbors = []
-
             neighbors += self.find_neighbors(node, self.Direction.N)
             neighbors += self.find_neighbors(node, self.Direction.W)
             neighbors += self.find_neighbors(node, self.Direction.NW)
@@ -218,7 +234,7 @@ class QuadTree:
         img.rectangle(rect, fill=None, outline="red")
 
         for child in node.children:
-            self._show_tree(img, child)
+            self._draw_tree(img, child)
         '''
         self._show_tree(img, node.ne)
         self._show_tree(img, node.sw)
@@ -317,7 +333,7 @@ class QuadTree:
                 lowest_distance = dist
                 
         return closest_node
-
+    
 
 if __name__ == "__main__":
     if os.path.isfile('ig.pkl'):
@@ -327,18 +343,13 @@ if __name__ == "__main__":
         pickle.dump(ig, open('ig.pkl','wb+'))
     # ig.show_map()
 
-    # qto = QuadTreeOptimizer(ig.map)
+    qto = QuadTreeOptimizer(ig.map)
     
-    # num_islands, min_distance, closest_locations, which_island = qto.get_min_distance()
-    # valid_numbers = (1, 2)
-    # MIN_RESOLUTION = qto._closest_power_of_2(int(min_distance))
+    num_islands, min_distance, closest_locations, which_island = qto.get_min_distance()
+    valid_numbers = (1, 2)
+    MIN_RESOLUTION = qto._closest_power_of_2(int(min_distance))
     
-    goal1 = [496, 81]
-    goal2 = [480, 225]
-    goal3 = [336, 400]
-    goal4 = [0,512] #impossible node
-
-    tree = QuadTree(ig.map, [33, 95], goal3)
+    tree = QuadTree(ig.map, [33, 95], [496, 81])
     img = tree.draw_tree(ig.img)
     # ig.img.save('map_pic.jpg')
     
