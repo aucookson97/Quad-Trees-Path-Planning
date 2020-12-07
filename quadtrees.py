@@ -25,7 +25,7 @@ def counter():
 count = counter()
 
 class Node(NodeMixin):
-    def __init__(self, name=None, world=None, top_left=None, size=None, parent=None, children=None):
+    def __init__(self, name=None, world=None, top_left=None, size=None, parent=None, children=None, start=None, goal=None):
         super(Node, self).__init__()
         self.name = name
         self.nw = self.ne = self.sw = self.se = None
@@ -34,23 +34,30 @@ class Node(NodeMixin):
         
         self.Astar_parent = None
         # costs for A* algorithm
+
         self.f = np.Inf
         self.g = np.Inf
         new_size = int(size / 2)
         center = (top_left[1] + new_size, top_left[0] + new_size)
+        start_node_cost = np.sqrt(np.square(center[0]-start[0])+ np.square(center[1]-start[1]))
+        goal_node_cost = np.sqrt(np.square(center[0] - goal[0])+ np.square(center[1] - goal[1]))
+        node_cost = start_node_cost + goal_node_cost
 
+        split = (start_node_cost <= 200 or goal_node_cost <= 200 or node_cost <= 700)
         self.pos = None
 
         world_slice = world[top_left[0]: top_left[0] + size, top_left[1]: top_left[1] + size]
 
-        if np.min(world_slice) != np.max(world_slice) and size >= 8:
+        if np.min(world_slice) != np.max(world_slice) and size >= 8 and split:
             # (NW, NE, SE, SW)
             for new_top_left in [top_left, (top_left[0], center[0]), (center[1], top_left[1]), (center[1], center[0])]:
                 child = Node(name=next(count),
                             world=world,
                             top_left=new_top_left,
                             size=new_size,
-                            parent=self)
+                            parent=self,
+                            start=start,
+                            goal=goal)
                 self.children += (child,)
 
         elif not np.any(world_slice):
@@ -78,7 +85,9 @@ class QuadTree:
                          world = world,
                          top_left = (0, 0),
                          size = self.world.shape[0],
-                         parent=None)
+                         parent=None,
+                         start=start,
+                         goal=goal)
         self.adj_truth_table = [[True, True, False, False],
                                 [False, True, False, True],
                                 [False, False, True, True],
@@ -96,7 +105,7 @@ class QuadTree:
         
         self.start_node = self.get_closest_node(start)
         self.goal_node = self.get_closest_node(goal)
-        self.prune_heuristic()
+        #self.prune_heuristic()
 
     def prune_heuristic(self):
         '''
@@ -324,6 +333,8 @@ if __name__ == "__main__":
     tree.get_closest_node([496, 81])
 
     ig.img.show()
-    
-
-    print('{} nodes in the tree'.format(next(count)))
+    A_nodes=0
+    for _,_, node in RenderTree(tree.root):
+        if node.pos is not None:
+            A_nodes+=1
+    print('{} nodes in the A star algorithm'.format(A_nodes))
