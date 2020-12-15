@@ -32,6 +32,7 @@ class Node(NodeMixin):
 
         self.f = np.Inf
         self.g = np.Inf
+        self.rhs = np.Inf
         new_size = int(size / 2)
         center = (top_left[1] + new_size, top_left[0] + new_size)
         start_node_cost = np.sqrt(np.square(center[0]-start[0])+ np.square(center[1]-start[1]))
@@ -64,6 +65,12 @@ class Node(NodeMixin):
         # costs for A* algorithm
         self.f = np.Inf
         self.g = np.Inf
+
+    def __lt__(self, other):
+        if int(self.name) < int(other.name):
+            return True
+        else:
+            return False
 
 
 class QuadTree:
@@ -300,6 +307,13 @@ class QuadTree:
             neighbor = self.get_corner_neighbor(node, direction)
         neighbors = self.check_smaller_neighbors(neighbor, direction)
         return neighbors
+
+    def find_all_direction_neighbors(self, node):
+        all_neighbors = []
+        for direction in self.Direction:
+            neighbors = self.find_neighbors(node, direction)
+            all_neighbors += neighbors
+        return [x for x in all_neighbors if x.pos is not None ]
 
     def get_closest_node(self, node_position):
     

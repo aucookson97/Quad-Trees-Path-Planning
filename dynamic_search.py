@@ -8,6 +8,7 @@ import os
 import time
 from matplotlib import pyplot as plt
 from matplotlib import animation
+from D_star_lite import Dstarlite
 
 RANGE = 100 # How far the boat can "see"
 TIME_STEP_LENGTH = 100 # In milliseconds
@@ -130,13 +131,14 @@ class AStarDynamic:
 
 class Obstacle:
 
-    CHANCE_TO_STAY_STILL = .7 # 0-1
+    CHANCE_TO_STAY_STILL = 0 # 0-1
 
     def __init__(self, tree, start_node):
         self.tree = tree
         self.current_node = start_node
         self.current_node.is_valid = False
         self.seen = False
+        self.prev_node = None
 
     def move(self, player_node, goal_node):
         """ Move to one of the neighboring nodes
@@ -153,6 +155,7 @@ class Obstacle:
             next_node = np.random.choice(all_neighbors)
             self.current_node.is_valid = True
             next_node.is_valid = False
+            self.prev_node = self.current_node
             self.current_node = next_node
 
     def get_pos(self):
@@ -179,7 +182,8 @@ class SimulateTravel:
                 if node != self.start_node and node != self.goal_node and node.is_valid:
                     valid_pos = True
             self.obstacles.append(Obstacle(self.tree, node))
-
+        self.Dstarlite = Dstarlite(self.tree)
+        print('initialized')
         # self.obstacles.append(Obstacle(self.tree, self.tree.get_closest_node((432, 240))))
 
         # for i in range(len(self.obstacles)):
@@ -202,7 +206,7 @@ class SimulateTravel:
         # Draw Obstacles (Cant be combined with above loop)
         for obstacle in self.obstacles:
             if not self.fog or (obstacle.seen or self.fog and (np.square(obstacle.current_node.pos[0] - self.start_node.pos[0]) + \
-                                                                    np.square(obstacle.current_node.pos[1] - self.start_node.pos[1])) < RANGE**2):
+                                                                np.square(obstacle.current_node.pos[1] - self.start_node.pos[1])) < RANGE**2):
                 self.draw_boat(img_new, obstacle.get_pos())
 
         # Update MATLAB Plot 
@@ -210,8 +214,7 @@ class SimulateTravel:
         self.fig.canvas.draw_idle()
         plt.pause(10)
         # _ = input('Press Enter to Start.')
-        self.simulate()
-        _ = input('Press Enter to Close.')
+        #_ = input('Press Enter to Close.')
 
         # for i in range(len(path)-1):
         #     A_map.line((tuple(path[i].pos), tuple(path[i+1].pos)), fill="black")
@@ -234,8 +237,12 @@ class SimulateTravel:
 
             # Re-run A star with moved obstacles and from the current position
             self.tree.start_node = current_node
-            Astar = AStarDynamic(self.tree)
-            path = Astar.run()
+            #Astar = AStarDynamic(self.tree)
+            print('move')
+            self.Dstarlite.next_move(current_node, self.obstacles)
+            path = [current_node, self.Dstarlite.next_position]
+            #print(self.Dstarlite.start_node)
+            #path = Astar.run()
 
             self.update_mask(current_node.pos)
 
@@ -321,7 +328,8 @@ if __name__ == "__main__":
     goal3 = [336, 400]
     goal4 = [0,512] #impossible node
 
-    path = SimulateTravel(ig, start, goal1, 20, fog=False)
+    dynamic_obs = SimulateTravel(ig, start, goal2, 50, fog=False)
+    dynamic_obs.simulate()
 
 
-    # ig.img.save('map1.png')
+    ig.img.save('map1.png')
