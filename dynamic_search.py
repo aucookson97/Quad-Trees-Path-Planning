@@ -237,10 +237,10 @@ class SimulateTravel:
 
             # Re-run A star with moved obstacles and from the current position
             self.tree.start_node = current_node
-            #Astar = AStarDynamic(self.tree)
-            print('move')
             self.Dstarlite.next_move(current_node, self.obstacles)
             path = [current_node, self.Dstarlite.next_position]
+
+            #Astar = AStarDynamic(self.tree)
             #print(self.Dstarlite.start_node)
             #path = Astar.run()
 
@@ -317,7 +317,7 @@ if __name__ == "__main__":
     if os.path.isfile('ig.pkl'):
         ig = pickle.load(open('ig.pkl','rb'))
     else:
-       ig = IslandGenerator(512 ,.07)
+       ig = IslandGenerator(1024 ,.07)
        pickle.dump(ig,open('ig.pkl','wb+'))
     
     start = [33, 95]
@@ -328,7 +328,7 @@ if __name__ == "__main__":
     goal3 = [336, 400]
     goal4 = [0,512] #impossible node
 
-    dynamic_obs = SimulateTravel(ig, start, goal2, 50, fog=False)
+    dynamic_obs = SimulateTravel(ig, start, goal3, 30, fog=False)
     dynamic_obs.simulate()
 
 

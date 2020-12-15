@@ -7,6 +7,7 @@ from procedural_generation import IslandGenerator
 from PIL import Image, ImageDraw, ImageFont
 from enum import Enum
 import pickle
+import time
 
 def counter():
     count = 0
@@ -17,6 +18,9 @@ def counter():
 count = counter()
 
 MIN_RESOLUTION = 8
+MAP_SIZE = 512
+THRESHOLD1 = np.sqrt(1.7) * MAP_SIZE
+THRESHOLD2 = MAP_SIZE/2
 
 class Node(NodeMixin):
     def __init__(self, name=None, world=None, top_left=None, size=None, parent=None, children=None, start=None, goal=None):
@@ -36,15 +40,14 @@ class Node(NodeMixin):
         self.rhs = np.Inf
         new_size = int(size / 2)
         center = (top_left[1] + new_size, top_left[0] + new_size)
-        start_node_cost = np.sqrt(np.square(center[0]-start[0])+ np.square(center[1]-start[1]))
-        goal_node_cost = np.sqrt(np.square(center[0] - goal[0])+ np.square(center[1] - goal[1]))
+        start_node_cost = np.sqrt(np.square(center[0]-start[0]) + np.square(center[1]-start[1]))
+        goal_node_cost = np.sqrt(np.square(center[0]-goal[0]) + np.square(center[1]-goal[1]))
         node_cost = start_node_cost + goal_node_cost
+        split = (start_node_cost <= THRESHOLD2 or goal_node_cost <= THRESHOLD2 or node_cost <= THRESHOLD1)
 
-        split = (start_node_cost <= 200 or goal_node_cost <= 200 or node_cost <= 700)
         self.pos = None
 
         world_slice = world[top_left[0]: top_left[0] + size, top_left[1]: top_left[1] + size]
-
 
         if np.min(world_slice) != np.max(world_slice) and size >= MIN_RESOLUTION and split:
 
@@ -337,11 +340,12 @@ class QuadTree:
 
 
 if __name__ == "__main__":
-    if os.path.isfile('ig.pkl'):
-        ig = pickle.load(open('ig.pkl','rb'))
-    else:
-        ig = IslandGenerator(512 ,.07)
-        pickle.dump(ig, open('ig.pkl','wb+'))
+
+    # if os.path.isfile('ig.pkl'):
+    #     ig = pickle.load(open('ig.pkl','rb'))
+    # else:
+    #     ig = IslandGenerator(MAP_SIZE ,.07)
+    #     pickle.dump(ig, open('ig.pkl','wb+'))
     # ig.show_map()
 
     # qto = QuadTreeOptimizer(ig.map)
@@ -349,23 +353,34 @@ if __name__ == "__main__":
     # num_islands, min_distance, closest_locations, which_island = qto.get_min_distance()
     # valid_numbers = (1, 2)
     # MIN_RESOLUTION = qto._closest_power_of_2(int(min_distance))
-    
+
     goal1 = [496, 81]
     goal2 = [480, 225]
     goal3 = [336, 400]
     goal4 = [0,512] #impossible node
-
-    tree = QuadTree(ig.map, [33, 95], goal3)
-    img = tree.draw_tree(ig.img)
+    timing = []
+    leaf_count = []
+    for _ in range(100):
+        ig = IslandGenerator(MAP_SIZE, .07)
+        start = time.perf_counter()
+        tree = QuadTree(ig.map, [33, 95], goal3)
+        end = time.perf_counter()
+        timing.append(end-start)
+        leaves = 0
+        for _,_, node in RenderTree(tree.root):
+            if node.pos is not None:
+                leaves += 1
+        leaf_count.append(leaves)
+        if _ == 99:
+            img = tree.draw_tree(ig.img)
+    print('Timing average over 100 instances: {}'.format(np.mean(timing)))
+    print('Avg number of leaves over 100 instances: {}'.format(np.mean(leaf_count)))
+    # img = tree.draw_tree(ig.img)
     # ig.img.save('map_pic.jpg')
-    
-    tree.get_closest_node([33, 95])
-    
-    tree.get_closest_node([496, 81])
 
-    ig.img.show()
-    A_nodes=0
-    for _,_, node in RenderTree(tree.root):
-        if node.pos is not None:
-            A_nodes+=1
-    print('{} nodes in the A star algorithm'.format(A_nodes))
+    #
+    # A_nodes=0
+    # for _,_, node in RenderTree(tree.root):
+    #     if node.pos is not None:
+    #         A_nodes+=1
+    # print('{} nodes in the A star algorithm'.format(A_nodes))

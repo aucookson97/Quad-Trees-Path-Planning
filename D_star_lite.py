@@ -12,8 +12,9 @@ class Dstarlite:
         self.s_last = self.next_position
         self.k_m = 0
 
+        #queue will be a heap of size 3 tuples
         self.queue = [(*self.calculate_key(self.goal_node), self.goal_node)]
-        print(self.queue)
+
         heapq.heapify(self.queue)
         self.compute_shortest_path()
 
@@ -62,11 +63,12 @@ class Dstarlite:
 
         self.queue = [x for x in self.queue if x[2] != node]
 
+        # if node locally inconsistent, we add the node back to the queue
         if node.g != node.rhs:
             heapq.heappush(self.queue, (*self.calculate_key(node), node))
 
     def compute_shortest_path(self):
-
+        print(self.top_key())
         while self.top_key() < self.calculate_key(self.next_position) or self.next_position.rhs != self.next_position.g:
             priority_node = heapq.heappop(self.queue)
 
@@ -87,6 +89,11 @@ class Dstarlite:
                     self.update_vertex(v)
 
     def next_move(self, curr_node, obstacles):
+        '''
+        Call this function to update self.next_move to get the next move
+        :param curr_node: current position of robot
+        :param obstacles: list of Obstacles objects, needed for updating the edge costs
+        '''
         if curr_node.g == np.Inf:
             return None
         next_node = self.calculate_min_cost_neigh(curr_node)
