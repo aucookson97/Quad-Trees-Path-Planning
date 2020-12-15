@@ -119,7 +119,9 @@ if __name__ == "__main__":
     else:
        ig = IslandGenerator(512 ,.07)
        pickle.dump(ig,open('ig.pkl','wb+'))
+
     # ig.show_map()
+
     
     start = [33, 95]
 
@@ -129,7 +131,9 @@ if __name__ == "__main__":
     goal3 = [336, 400]
     goal4 = [0,512] #impossible node
 
+
     tree = QuadTree(ig.map, start, goal3)
+
 
     Astar = A_star(tree)
     path = Astar.run()

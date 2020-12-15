@@ -28,6 +28,7 @@ class Node(NodeMixin):
         
         self.Astar_parent = None
         # costs for A* algorithm
+
         self.is_valid = True
 
         self.f = np.Inf
@@ -44,7 +45,9 @@ class Node(NodeMixin):
 
         world_slice = world[top_left[0]: top_left[0] + size, top_left[1]: top_left[1] + size]
 
+
         if np.min(world_slice) != np.max(world_slice) and size >= MIN_RESOLUTION and split:
+
             # (NW, NE, SE, SW)
             for new_top_left in [top_left, (top_left[0], center[0]), (center[1], top_left[1]), (center[1], center[0])]:
                 child = Node(name=next(count),
@@ -361,6 +364,8 @@ if __name__ == "__main__":
     tree.get_closest_node([496, 81])
 
     ig.img.show()
-    
-
-    print('{} nodes in the tree'.format(next(count)))
+    A_nodes=0
+    for _,_, node in RenderTree(tree.root):
+        if node.pos is not None:
+            A_nodes+=1
+    print('{} nodes in the A star algorithm'.format(A_nodes))
