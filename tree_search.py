@@ -54,7 +54,6 @@ class A_star:
         while self.open_list:
             self.open_list.sort(key=lambda node: self._get_cost(node), reverse=True)
             current_node = self.open_list.pop()
-
             self.closed_list.add(current_node)
 
             if current_node == self.goal_node:
@@ -120,7 +119,9 @@ if __name__ == "__main__":
     else:
        ig = IslandGenerator(512 ,.07)
        pickle.dump(ig,open('ig.pkl','wb+'))
-    #ig.show_map()
+
+    # ig.show_map()
+
     
     start = [33, 95]
 
@@ -130,13 +131,14 @@ if __name__ == "__main__":
     goal3 = [336, 400]
     goal4 = [0,512] #impossible node
 
-    tree = QuadTree(ig.map, start, goal2)
-    
-    img_draw = tree.draw_tree(ig.img)
-    ig.img.show()
+
+    tree = QuadTree(ig.map, start, goal3)
+
 
     Astar = A_star(tree)
     path = Astar.run()
+
+    img_draw = tree.draw_tree(ig.img)
 
     if path is not None:
         Astar.motion_plan(img_draw, path)
